@@ -21,6 +21,10 @@ export default defineConfig({
             .replace("HTMLAttributes.src:''", "mediaPath(HTMLAttributes.src):''");
         }
         return code
+          .replace(/<a\b[^>]*href="\/signin-with-chatgpt[^"]*"[^>]*>Continue with ChatGPT<\/a>/g, "")
+          .replace('<div className="auth-divider">or</div>', "")
+          .replace(/<button\b[^>]*onClick=\{\(\)=>begin\(\{action:'link-chatgpt'\}\)\}[^>]*>Link ChatGPT<\/button>/g, "")
+          .replace(" Already use ChatGPT sign-in? Sign in there and use Settings → Account & sign-in to link email to your existing planner.", "")
           .replace(/(["'])\/login(?=[?"'])/g, "$1/Nextstep/login/")
           .replace(/(href=|location\.assign\()(["'])\/\2/g, "$1$2/Nextstep/$2")
           .replace(/(["'])\/sw\.js\1/g, "$1/Nextstep/sw.js$1")

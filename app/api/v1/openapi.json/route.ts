@@ -1,0 +1,1 @@
+import {openApi} from '../../../../lib/api-openapi';export function GET(req:Request){return Response.json(openApi(new URL(req.url).origin),{headers:{'Cache-Control':'public, max-age=300','Access-Control-Allow-Origin':'*'}})}

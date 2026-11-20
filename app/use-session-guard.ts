@@ -1,0 +1,5 @@
+'use client';
+import {useLayoutEffect,useState} from 'react';
+export default function useSessionGuard(identity:string){const [expired,setExpired]=useState(false);
+ useLayoutEffect(()=>{if(!identity)return;const original=window.fetch;const guarded:typeof fetch=async(input,init)=>{const url=new URL(input instanceof Request?input.url:String(input),location.href);if(url.origin!==location.origin||!url.pathname.startsWith('/api/'))return original(input,init);const headers=new Headers(input instanceof Request?input.headers:undefined);new Headers(init?.headers).forEach((v,k)=>headers.set(k,v));headers.set('X-Nextstep-Session',identity);const method=(init?.method||(input instanceof Request?input.method:'GET')).toUpperCase();const response=await original(input,{...init,headers});if(response.status===401)setExpired(true);else if(url.pathname==='/api/session'&&response.ok)setExpired(false);if(response.ok&&!['GET','HEAD','OPTIONS'].includes(method))window.dispatchEvent(new Event('nextstep-written'));return response};window.fetch=guarded;return()=>{if(window.fetch===guarded)window.fetch=original}},[identity]);return expired;
+}

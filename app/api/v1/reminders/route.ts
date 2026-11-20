@@ -1,0 +1,1 @@
+import {remindersRequest,reminderOptions} from '../../../../lib/api-reminders';export const dynamic='force-dynamic';export const GET=(req:Request)=>remindersRequest(req);export const POST=GET;export const OPTIONS=reminderOptions;

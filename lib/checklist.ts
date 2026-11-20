@@ -1,0 +1,8 @@
+import {joinRich,fitRich} from './richtext';
+import type {Confirmation,ConfirmationTemplate,Task} from './model';
+export const confirmationComplete=(c:Confirmation)=>c.status==='Confirmed'||c.status==='Not applicable';
+export function checklistProgress(checklist:Confirmation[]){return {total:checklist.length,complete:checklist.filter(confirmationComplete).length,remaining:checklist.filter(c=>c.required&&!confirmationComplete(c)).length,ready:checklist.length>0&&checklist.every(c=>!c.required||confirmationComplete(c))};}
+export function freshConfirmation(label='',instructions='',required=true):Confirmation{return {id:crypto.randomUUID(),label,instructions,required,status:'Pending',result:'',contact:'',follow:'',note:'',linkedTaskId:'',checkedAt:''};}
+export function instantiateTemplate(items:ConfirmationTemplate[]):Confirmation[]{return items.map(c=>freshConfirmation(c.label,c.instructions,c.required));}
+export function makeTemplate(items:Confirmation[]):ConfirmationTemplate[]{return items.map(c=>({id:crypto.randomUUID(),label:c.label,instructions:c.instructions,required:c.required}));}
+export function promotionDetails(parent:Task,c:Confirmation,tracker:'Task'|'Issue'){return {title:c.label.slice(0,250),projectId:parent.projectId,tracker,status:tracker==='Issue'?'New':c.status==='Waiting'&&c.follow?'Waiting':'Ready',parentId:tracker==='Task'?parent.id:'',relatedIds:tracker==='Issue'?[parent.id]:[],follow:c.follow,waitingOn:c.contact,notes:fitRich(joinRich([c.instructions,c.result?'Current result:':'',c.result,c.contact?'Contact: '+c.contact:'',c.note?'Note / evidence:':'',c.note]))};}

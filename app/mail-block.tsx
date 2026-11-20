@@ -1,0 +1,5 @@
+'use client';
+import type {EmailMetadata} from '../lib/mail-content';
+import {Mail,Paperclip} from 'lucide-react';
+export function MailHeader({meta}:{meta:EmailMetadata}){return <header className="mail-block-header"><span className="mail-source-badge"><Mail size={15}/> Imported email · {meta.sourceFormat.toUpperCase()}</span><h4>{meta.subject||'(No subject)'}</h4><dl>{[['From',meta.from],['To',meta.to],['CC',meta.cc],['BCC',meta.bcc],['Sent',meta.date]].filter(([,value])=>value).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><details className="mail-source-details"><summary>Source details</summary><p>{meta.sourceName}</p>{meta.messageId&&<p>Message-ID: {meta.messageId}</p>}{meta.inReplyTo&&<p>In reply to: {meta.inReplyTo}</p>}{meta.references&&<p>References: {meta.references}</p>}<small>Imported {meta.importedAt}</small></details></header>}
+export function FileLink({src,name,size}:{src:string;name:string;size:number}){return <a className="mail-file-link" href={src} download><Paperclip size={16}/><span>{name}</span><small>{size>=1024*1024?(size/1024/1024).toFixed(1)+' MB':Math.ceil(size/1024)+' KB'}</small></a>}

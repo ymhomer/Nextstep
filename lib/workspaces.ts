@@ -1,0 +1,10 @@
+import {env} from 'cloudflare:workers';
+export function workspaceDb(){if(!env.DB)throw new Error('Workspace database is unavailable.');return env.DB}
+export type WorkspaceRole='owner'|'editor'|'viewer';
+export type WorkspaceInfo={id:string;name:string;purpose:string;role:WorkspaceRole;ownerId:string;sharingEnabled:number;createdAt:number};
+export type WorkspaceScope={id:string;role:WorkspaceRole};
+export async function workspaceScope(userId:string,id:string):Promise<WorkspaceScope|null>{if(!id)return {id:'',role:'owner'};if(!/^[a-f0-9-]{36}$/.test(id))return null;const row=await workspaceDb().prepare("SELECT m.role FROM workspace_members m INNER JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND (w.sharing_enabled=1 OR m.role='owner')").bind(id,userId).first<{role:WorkspaceRole}>();return row?{id,role:row.role}:null}
+export const editable=(scope:WorkspaceScope)=>scope.role==='owner'||scope.role==='editor';
+export async function plannerRow(userId:string,scope:WorkspaceScope){return scope.id?workspaceDb().prepare('SELECT data,revision FROM workspace_planners WHERE workspace_id=?').bind(scope.id).first<{data:string;revision:number}>():workspaceDb().prepare('SELECT data,revision FROM planners WHERE user_id=?').bind(userId).first<{data:string;revision:number}>()}
+export function writablePlanner(userId:string,scope:WorkspaceScope,data:string,revision:number){if(!scope.id)return revision===0?workspaceDb().prepare('INSERT INTO planners(user_id,data,revision) VALUES (?,?,1)').bind(userId,data):workspaceDb().prepare('UPDATE planners SET data=?,revision=revision+1 WHERE user_id=? AND revision=?').bind(data,userId,revision);return workspaceDb().prepare("UPDATE workspace_planners SET data=?,revision=revision+1 WHERE workspace_id=? AND revision=? AND EXISTS(SELECT 1 FROM workspace_members WHERE workspace_id=? AND user_id=? AND role IN ('owner','editor') AND (role='owner' OR EXISTS(SELECT 1 FROM workspaces WHERE id=workspace_id AND sharing_enabled=1)))").bind(data,scope.id,revision,scope.id,userId)}
+export const workspaceId=(req:Request)=>new URL(req.url).searchParams.get('workspace')||'';

@@ -1,0 +1,2 @@
+import {workspaceDb} from './workspaces';
+export function notification(userId:string,workspace:string,kind:string,title:string,body:string,inviteId:string|null=null){return workspaceDb().prepare('INSERT INTO notifications(id,user_id,workspace_id,kind,title,body,invite_id,created_at) SELECT ?,?,?,?,?,?,?,? WHERE ?=\'invite\' OR COALESCE((SELECT updates FROM notification_settings WHERE user_id=?),1)=1').bind(crypto.randomUUID(),userId,workspace,kind,title,body,inviteId,Date.now(),kind,userId)}

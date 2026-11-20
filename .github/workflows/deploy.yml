@@ -1,0 +1,48 @@
+name: Deploy Nextstep
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: nextstep-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@11.25.0
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/generate-pdf-data.mjs
+      - name: Build backend and frontend
+        env:
+          NEXTSTEP_STANDALONE: 'true'
+          VITE_NEXTSTEP_API_ORIGIN: https://nextstep-api.ymhomer-4253.workers.dev
+        run: |
+          pnpm build
+          pnpm exec vite build --config github-pages/vite.config.ts
+          mkdir -p dist/pages/login
+          cp dist/pages/index.html dist/pages/login/index.html
+      - name: Prepare and deploy the Cloudflare backend
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: bash scripts/deploy-standalone.sh
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/pages
+      - id: pages
+        uses: actions/deploy-pages@v4

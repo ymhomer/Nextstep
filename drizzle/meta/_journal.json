@@ -1,0 +1,76 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1792386987811,
+      "tag": "0000_confused_tenebrous",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792387432499,
+      "tag": "0001_gifted_kang",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792390307653,
+      "tag": "0002_late_zarek",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792484179053,
+      "tag": "0003_steady_salo",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792556000000,
+      "tag": "0004_account_workspace_management",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792560000000,
+      "tag": "0005_passkeys_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792566000000,
+      "tag": "0006_web_push",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792727301580,
+      "tag": "0007_charming_fixer",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792747279150,
+      "tag": "0008_normal_doctor_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792747670195,
+      "tag": "0009_yielding_thor_girl",
+      "breakpoints": true
+    }
+  ]
+}

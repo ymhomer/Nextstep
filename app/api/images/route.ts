@@ -1,0 +1,11 @@
+import { env } from 'cloudflare:workers';
+import { getPlannerUser } from '../../../lib/user';
+import { getDb } from '../../../db';
+import { images } from '../../../db/schema';
+import { limited } from '../../../lib/local-auth';
+import {workspaceScope,editable} from '../../../lib/workspaces';
+import { digest } from '../../../lib/password';
+import {MAX_IMAGE_BYTES,imageType,boundedBytes} from '../../../lib/image-files';
+export const dynamic='force-dynamic';
+const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
+export async function POST(req:Request){const user=await getPlannerUser();if(!user)return reply({error:'Sign in to upload images.'},401);if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'Invalid request origin.'},403);const workspace=req.headers.get('x-workspace-id')||'';const scope=await workspaceScope(user.userId,workspace);if(!scope)return reply({error:'Workspace unavailable.'},404);if(!editable(scope))return reply({error:'This workspace is read-only.'},403);if(!env.BUCKET)return reply({error:'Image storage is unavailable.'},503);const recordId=req.headers.get('x-record-id')||'';if(!/^[A-Za-z0-9:_-]{1,100}$/.test(recordId))return reply({error:'Invalid record.'},400);if(await limited('image-upload',user.userId,60,900))return reply({error:'Too many uploads. Try again in 15 minutes.'},429);let bytes;try{bytes=await boundedBytes(req,MAX_IMAGE_BYTES)}catch(e){return reply({error:e instanceof Error?e.message:'Invalid image.'},413)}const mime=imageType(bytes);if(!mime)return reply({error:'Choose a JPG, PNG, GIF or WebP image.'},415);let filename='image';try{filename=decodeURIComponent(req.headers.get('x-file-name')||'image').replace(/[\x00-\x1f]/g,'').slice(0,200)}catch{}const id=crypto.randomUUID(),key=`images/${digest(user.userId)}/${id}`;await env.BUCKET.put(key,bytes,{httpMetadata:{contentType:mime}});try{await getDb().insert(images).values({id,userId:user.userId,recordId,objectKey:key,name:filename,mime,size:bytes.byteLength,createdAt:Date.now(),workspaceId:workspace||null})}catch{await env.BUCKET.delete(key);return reply({error:'Could not save image. Please retry.'},500)}return reply({id,src:'/api/images/'+id,name:filename,size:bytes.length});}

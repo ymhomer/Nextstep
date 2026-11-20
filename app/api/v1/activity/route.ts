@@ -1,0 +1,7 @@
+import {apiAccess,apiReply,apiHeaders,ApiError} from '../../../../lib/api-access';
+import {plannerRow} from '../../../../lib/workspaces';
+import {normalize} from '../../../../lib/workflow';
+import {activityEntries,filterActivity} from '../../../../lib/activity';
+export const dynamic='force-dynamic';
+export async function GET(req:Request){try{const {key,scope}=await apiAccess(req,'read');const row=await plannerRow(key.user_id,scope),revision=row?.revision||0,data=normalize(row?JSON.parse(row.data):{projects:[],tasks:[]});const url=new URL(req.url),number=(name:string,fallback:number)=>{const v=Number(url.searchParams.get(name));return Number.isSafeInteger(v)&&v>=0?v:fallback};const offset=number('offset',0),limit=Math.min(200,Math.max(1,number('limit',40)));const entries=filterActivity(activityEntries(data),{recordId:url.searchParams.get('recordId')||undefined,projectId:url.searchParams.has('projectId')?url.searchParams.get('projectId')!:undefined,kind:url.searchParams.get('kind')||undefined,category:url.searchParams.get('category')||undefined});return apiReply({data:entries.slice(offset,offset+limit),total:entries.length,offset,limit,revision,workspace:scope.id},200,revision)}catch(e){if(e instanceof ApiError)return apiReply({error:e.message},e.status);return apiReply({error:'Unable to read activity.'},500)}}
+export function OPTIONS(){return new Response(null,{status:204,headers:apiHeaders})}

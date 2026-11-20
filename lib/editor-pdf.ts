@@ -1,0 +1,2 @@
+import {Node} from '@tiptap/core';
+export const PdfNode=Node.create({name:'pdfBlock',group:'block',content:'block+',defining:true,isolating:true,addAttributes(){return {filename:{default:''},pages:{default:''}}},parseHTML(){return [{tag:'section[data-nextstep-pdf]',getAttrs:el=>({filename:(el as Element).getAttribute('data-nextstep-pdf')||'',pages:(el as Element).getAttribute('data-pages')||''})}]},renderHTML({node}){return ['section',{'data-nextstep-pdf':String(node.attrs.filename),'data-pages':String(node.attrs.pages)},0]}});

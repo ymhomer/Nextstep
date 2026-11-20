@@ -1,0 +1,1 @@
+import {remindersRequest,reminderOptions} from '../../../../../lib/api-reminders';export const dynamic='force-dynamic';type Context={params:Promise<{id:string}>};export async function GET(req:Request,ctx:Context){return remindersRequest(req,(await ctx.params).id)}export const DELETE=GET;export const OPTIONS=reminderOptions;

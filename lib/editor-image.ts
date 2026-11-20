@@ -1,0 +1,3 @@
+import {NodeSelection,type EditorState} from '@tiptap/pm/state';
+import type {Node} from '@tiptap/pm/model';
+export function moveImage(state:EditorState,direction:-1|1){const selection=state.selection;if(!('node' in selection))return null;const image=selection.node as Node;if(image?.type.name!=='image')return null;const neighbor=direction===-1?selection.$from.nodeBefore:selection.$to.nodeAfter;if(!neighbor)return null;const target=direction===-1?selection.from-neighbor.nodeSize:selection.from+neighbor.nodeSize;const tr=state.tr.delete(selection.from,selection.to).insert(target,image);tr.setSelection(NodeSelection.create(tr.doc,target));return tr;}

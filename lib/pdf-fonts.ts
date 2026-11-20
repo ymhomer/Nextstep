@@ -1,0 +1,2 @@
+// Local PDF.js resources: PDF contents never leave the app for font lookup.
+export class PdfBinaryData{async fetch({kind,filename}:{kind:string;filename:string}){const {data}=kind==='cMapUrl'?await import('./pdf-data/cmaps'):await import('./pdf-data/standard_fonts');const value=data[filename];if(!value)throw Error('The PDF requires an unsupported font mapping.');return Uint8Array.from(atob(value),c=>c.charCodeAt(0))}}

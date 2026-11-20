@@ -1,0 +1,12 @@
+import type {Planner,Sop} from './model';
+export type ActivityKind='Project'|'Task'|'Issue'|'Resource';
+export type ActivityEntry={id:string;recordId:string;kind:ActivityKind;number:number;title:string;projectId:string;at:string;actor:string;summary:string;note:string;categories:string[];version?:number;snapshot?:Sop['versions'][number]['content']};
+export function activityEntries(data:Planner):ActivityEntry[]{
+ const entries:ActivityEntry[]=[];
+ for(const task of data.tasks)for(const h of task.history){if(!Number.isFinite(Date.parse(h.at)))continue;const categories:string[]=[];if(/status|tracker/i.test(h.summary))categories.push('Status');if(/checklist|confirmation/i.test(h.summary))categories.push('Checklist');if(/notes|expected|actual|root cause|resolution|content/i.test(h.summary))categories.push('Content');if(!categories.length)categories.push('Other');entries.push({id:task.id+':'+h.id,recordId:task.id,kind:task.tracker,number:task.number,title:task.title,projectId:task.projectId,at:h.at,actor:h.actor,summary:h.summary,note:h.note,categories});}
+ for(const resource of data.sops)for(const v of resource.versions){if(!Number.isFinite(Date.parse(v.at)))continue;entries.push({id:resource.id+':v'+v.version,recordId:resource.id,kind:'Resource',number:resource.number,title:resource.title,projectId:resource.projectId,at:v.at,actor:v.actor,summary:'Version '+v.version+' saved',note:v.note,categories:['Content'],version:v.version,snapshot:v.content});}
+ for(const project of data.projects)for(const [label,at] of [['Project created',project.createdAt],['Project completed',project.completedAt]])if(at&&Number.isFinite(Date.parse(at)))entries.push({id:project.id+':'+label,recordId:project.id,kind:'Project',number:0,title:project.name,projectId:project.id,at,actor:'',summary:label,note:'',categories:[label==='Project completed'?'Status':'Other']});
+ return entries.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
+}
+export type ActivityFilter={recordId?:string;projectId?:string;kind?:string;category?:string};
+export function filterActivity(entries:ActivityEntry[],filter:ActivityFilter){return entries.filter(e=>(!filter.recordId||e.recordId===filter.recordId)&&(filter.projectId===undefined||filter.projectId==='All'||e.projectId===filter.projectId)&&(!filter.kind||filter.kind==='All'||e.kind===filter.kind)&&(!filter.category||filter.category==='All'||e.categories.includes(filter.category)));}

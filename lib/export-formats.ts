@@ -1,0 +1,45 @@
+/** Convert only the rendered export document; never read workspace/private UI. */
+const mdEscape=(value:string)=>value.replace(/([\\`*_{}\[\]<>])/g,'\\$1');
+export function documentMarkdown(root:HTMLElement):string{
+ const children=(node:Node):string=>Array.from(node.childNodes).map(visit).join('');
+ function visit(node:Node):string{
+  if(node.nodeType===3)return mdEscape(node.textContent||'');if(node.nodeType!==1)return '';
+  const e=node as HTMLElement,tag=e.tagName.toLowerCase();if(e.classList.contains('visual-data'))return '';
+  if(/^h[1-6]$/.test(tag))return '\n\n'+'#'.repeat(Number(tag[1]))+' '+children(e).trim()+'\n\n';
+  if(tag==='br')return '  \n';if(tag==='hr')return '\n\n---\n\n';
+  if(tag==='strong'||tag==='b')return '**'+children(e)+'**';if(tag==='em'||tag==='i')return '*'+children(e)+'*';if(tag==='s')return '~~'+children(e)+'~~';
+  if(tag==='pre'){const text=e.textContent||'';const fence='`'.repeat(Math.max(3,...(text.match(/`+/g)||[]).map(s=>s.length+1)));return '\n\n'+fence+'\n'+text+'\n'+fence+'\n\n';}
+  if(tag==='code')return '`'+(e.textContent||'').replace(/`/g,'\\`')+'`';
+  if(tag==='a')return '['+children(e)+'](<'+(e.getAttribute('href')||'').replace(/[<>\n]/g,'')+'>)';
+  if(tag==='img')return '!['+mdEscape(e.getAttribute('alt')||'')+'](<'+(e.getAttribute('src')||'')+'>)\n';
+  if(tag==='blockquote')return '\n\n'+children(e).trim().split('\n').map(l=>'> '+l).join('\n')+'\n\n';
+  if(tag==='ul'||tag==='ol'){const start=Number(e.getAttribute('start'))||1;return '\n\n'+Array.from(e.children).map((li,i)=>{const text=children(li).trim();const prefix=tag==='ol'?`${start+i}. `:'- ';return prefix+text.replace(/\n/g,'\n'+' '.repeat(prefix.length));}).join('\n')+'\n\n';}
+  if(tag==='table'){
+   if(e.querySelector('[colspan]:not([colspan="1"]),[rowspan]:not([rowspan="1"])'))return '\n\n'+e.outerHTML+'\n\n';
+   const rows=Array.from(e.querySelectorAll('tr')).map(r=>Array.from(r.children).map(c=>children(c).trim().replace(/\n+/g,'<br>').replace(/\|/g,'\\|')));if(!rows.length)return '';
+   const width=Math.max(...rows.map(r=>r.length));const row=(r:string[])=>'| '+Array.from({length:width},(_,i)=>r[i]||'').join(' | ')+' |';return '\n\n'+[row(rows[0]),row(Array(width).fill('---')),...rows.slice(1).map(row)].join('\n')+'\n\n';
+  }
+  if(tag==='dl')return '\n\n'+Array.from(e.children).map(c=>{const k=c.querySelector('dt')?.textContent,v=c.querySelector('dd')?.textContent;return k&&v?`- **${mdEscape(k)}:** ${mdEscape(v)}`:'';}).filter(Boolean).join('\n')+'\n\n';
+  const value=children(e);return ['p','section','article','header','figure'].includes(tag)||e.classList.contains('plain-rich')?'\n\n'+value+'\n\n':value;
+ }
+ return children(root).replace(/\n[ \t]+\n/g,'\n\n').replace(/\n{3,}/g,'\n\n').trim()+'\n';
+}
+export function downloadBlob(blob:Blob,name:string){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+const blobData=(blob:Blob):Promise<string>=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(Error('Unable to read an image.'));r.readAsDataURL(blob)});
+export async function exportClone(root:HTMLElement,mode:'files'|'inline'){
+ const clone=root.cloneNode(true) as HTMLElement;const files:Record<string,Uint8Array>={};const sources=new Map<string,{path:string;data:string}>();
+ for(const img of Array.from(clone.querySelectorAll('img'))){const src=img.getAttribute('src')||'';if(!sources.has(src)){const u=new URL(src,location.origin);if(u.origin!==location.origin||!/^\/api\/images\/[a-f0-9-]{36}$/.test(u.pathname))throw Error('Unable to export an image source.');const r=await fetch(u.href,{credentials:'same-origin',signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('An image could not be downloaded.');const blob=await r.blob();if(!/^image\/(png|jpeg|webp|gif)$/.test(blob.type))throw Error('Unsupported image.');const ext=blob.type==='image/jpeg'?'jpg':blob.type.split('/')[1],path=`assets/image-${sources.size+1}.${ext}`;files[path]=new Uint8Array(await blob.arrayBuffer());sources.set(src,{path,data:mode==='inline'?await blobData(blob):''});}const asset=sources.get(src)!;img.setAttribute('src',mode==='inline'?asset.data:asset.path);img.removeAttribute('loading');}
+ for(const [i,svg] of Array.from(clone.querySelectorAll('svg')).entries()){svg.setAttribute('xmlns','http://www.w3.org/2000/svg');const text=new XMLSerializer().serializeToString(svg),path=`assets/visual-${i+1}.svg`;files[path]=new TextEncoder().encode(text);const img=document.createElement('img');img.alt=svg.getAttribute('aria-label')||'Diagram';img.src=mode==='inline'?await blobData(new Blob([text],{type:'image/svg+xml'})):path;svg.replaceWith(img);}
+ clone.querySelectorAll('.visual-data').forEach(e=>e.remove());clone.querySelectorAll('button').forEach(b=>b.replaceWith(...Array.from(b.childNodes)));clone.querySelectorAll('[tabindex]').forEach(e=>e.removeAttribute('tabindex'));return {clone,files};
+}
+export async function markdownDownload(root:HTMLElement,name:string){const {clone,files}=await exportClone(root,'files');const markdown=documentMarkdown(clone);if(Object.keys(files).length){const {zipSync}=await import('fflate');const bytes=zipSync({...files,[name+'.md']:new TextEncoder().encode(markdown)});downloadBlob(new Blob([bytes as BlobPart],{type:'application/zip'}),name+'.zip');}else downloadBlob(new Blob([markdown],{type:'text/markdown;charset=utf-8'}),name+'.md');}
+export async function copyDocument(root:HTMLElement){const plain=documentMarkdown(root);if(navigator.clipboard?.write&&typeof ClipboardItem!=='undefined'){const html=exportClone(root,'inline').then(({clone})=>new Blob([clone.innerHTML],{type:'text/html'}));await navigator.clipboard.write([new ClipboardItem({'text/html':html,'text/plain':new Blob([plain],{type:'text/plain'})})]);}else if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(plain);else throw Error('Clipboard is unavailable. Download Markdown instead.');}
+/** Keep page canvases bounded, and move a fitting paragraph/table row/image to the next page. */
+export function pageRanges(height:number,blocks:{top:number;bottom:number}[],pageHeight=1123){const result:{start:number;end:number}[]=[];let start=0;while(start<height){let end=Math.min(height,start+pageHeight);if(end<height){const crossing=blocks.filter(b=>b.top>start+40&&b.top<end&&b.bottom>end&&b.bottom-b.top<=pageHeight);if(crossing.length)end=Math.min(...crossing.map(b=>b.top));}result.push({start,end});start=end;}return result;}
+export async function pngDownload(root:HTMLElement,name:string){
+ const [{toCanvas},{zipSync}]=await Promise.all([import('html-to-image'),import('fflate')]);const {clone}=await exportClone(root,'inline');const host=document.createElement('div');host.setAttribute('aria-hidden','true');host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;';clone.style.cssText='width:794px;max-width:none;padding:44px;box-sizing:border-box;margin:0;box-shadow:none;background:white;color:#182c47;font:14px/1.65 Arial,sans-serif;';host.appendChild(clone);document.body.appendChild(host);
+ try{await document.fonts.ready;await Promise.all(Array.from(clone.querySelectorAll('img')).map(i=>i.decode()));const rect=clone.getBoundingClientRect();const height=Math.ceil(clone.scrollHeight);const blocks=Array.from(clone.querySelectorAll('p,tr,figure,h1,h3,h4,pre')).map(e=>{const r=e.getBoundingClientRect();return {top:Math.floor(r.top-rect.top),bottom:Math.ceil(r.bottom-rect.top)}});const pages=pageRanges(height,blocks);if(pages.length>80)throw Error('This document is too long for image export. Use PDF or Markdown.');const files:Record<string,Uint8Array>={};
+ for(let i=0;i<pages.length;i++){const {start,end}=pages[i];const page=document.createElement('div');page.style.cssText=`position:relative;width:794px;height:${end-start+48}px;overflow:hidden;background:white;`;const frame=document.createElement('div');frame.style.cssText=`position:absolute;top:24px;left:0;width:794px;height:${end-start}px;overflow:hidden;`;const content=clone.cloneNode(true) as HTMLElement;content.style.position='absolute';content.style.top=-start+'px';content.style.left='0';frame.appendChild(content);page.appendChild(frame);host.appendChild(page);const canvas=await toCanvas(page,{width:794,height:end-start+48,pixelRatio:1.5,backgroundColor:'#ffffff',skipFonts:true});const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Image rendering failed.')),'image/png'));files[`${name}-${String(i+1).padStart(2,'0')}.png`]=new Uint8Array(await blob.arrayBuffer());page.remove();canvas.width=0;canvas.height=0;}
+ const entries=Object.entries(files);if(entries.length===1)downloadBlob(new Blob([entries[0][1] as BlobPart],{type:'image/png'}),name+'.png');else downloadBlob(new Blob([zipSync(files) as BlobPart],{type:'application/zip'}),name+'-images.zip');
+ }finally{host.remove();}
+}
